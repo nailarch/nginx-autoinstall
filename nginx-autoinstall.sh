@@ -98,6 +98,9 @@ case $OPTION in
 			while [[ $BROTLI != "y" && $BROTLI != "n" ]]; do
 				read -p "       Brotli [y/n]: " -e BROTLI
 			done
+			while [[ $TCP != "y" && $TCP != "n" ]]; do
+					read -p "       Cloudflare's TLS Dynamic Record Resizing patch [y/n]: " -e TCP
+			done
 			while [[ $HEADERMOD != "y" && $HEADERMOD != "n" ]]; do
 				read -p "       Headers More $HEADERMOD_VER [y/n]: " -e HEADERMOD
 			done
@@ -335,9 +338,8 @@ case $OPTION in
 		--http-client-body-temp-path=/var/cache/nginx/client_temp \
 		--http-proxy-temp-path=/var/cache/nginx/proxy_temp \
 		--http-fastcgi-temp-path=/var/cache/nginx/fastcgi_temp \
-		--user=nginx \
-		--group=nginx \
-		--with-cc-opt=-Wno-deprecated-declarations"
+		--user=www-data \
+		--group=www-data"
 
 		NGINX_MODULES="--with-threads \
 		--with-file-aio \
@@ -347,6 +349,7 @@ case $OPTION in
 		--with-http_auth_request_module \
 		--with-http_slice_module \
 		--with-http_stub_status_module \
+		--with-http_v2_hpack_enc \
 		--with-http_realip_module \
 		--with-http_sub_module"
 
@@ -366,6 +369,24 @@ case $OPTION in
 
 		if [[ "$BROTLI" = 'y' ]]; then
 			NGINX_MODULES=$(echo "$NGINX_MODULES"; echo "--add-module=/usr/local/src/nginx/modules/ngx_brotli")
+		fi
+
+		# Cloudflare's TLS Dynamic Record Resizing patch
+		if [[ "$TCP" = 'y' ]]; then
+			echo -ne "       TLS Dynamic Records support    [..]\r"
+			wget https://raw.githubusercontent.com/nailarch/patch/master/nginx.patch >> /tmp/nginx-autoinstall.log 2>&1
+			patch -p1 < nginx.patch >> /tmp/nginx-autoinstall.log 2>&1
+
+			if [ $? -eq 0 ]; then
+				echo -ne "       TLS Dynamic Records support    [${CGREEN}OK${CEND}]\r"
+				echo -ne "\n"
+			else
+				echo -e "       TLS Dynamic Records support    [${CRED}FAIL${CEND}]"
+				echo ""
+				echo "Please look at /tmp/nginx-autoinstall.log"
+				echo ""
+				exit 1
+			fi
 		fi
 
 		if [[ "$HEADERMOD" = 'y' ]]; then
@@ -438,7 +459,8 @@ case $OPTION in
  			export LUAJIT_INC=/usr/local/include/luajit-2.1/
 		fi
 
-		./configure $NGINX_OPTIONS $NGINX_MODULES
+		./configure $NGINX_OPTIONS $NGINX_MODULES --with-cc-opt="-O3 -march=native -flto -funsafe-math-optimizations -fstack-protector-strong --param=ssp-buffer-size=4 -Wformat -Werror=format-security -Wp,-D_FORTIFY_SOURCE=2 -DTCP_FASTOPEN=23 -Wno-deprecated-declarations"
+
 		make -j "$(nproc)"
 		make install
 
