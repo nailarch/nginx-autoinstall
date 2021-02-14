@@ -6,10 +6,10 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Define versions
-NGINX_MAINLINE_VER=1.19.2
+NGINX_MAINLINE_VER=1.19.6
 NGINX_STABLE_VER=1.18.0
 LIBRESSL_VER=3.1.2
-OPENSSL_VER=1.1.1g
+OPENSSL_VER=1.1.1i
 NPS_VER=1.13.35.2
 HEADERMOD_VER=0.33
 LIBMAXMINDDB_VER=1.3.2
@@ -355,6 +355,21 @@ case $OPTION in
 		--with-http_realip_module \
 		--with-http_sub_module"
 
+	# Cloudflare's TLS Dynamic Record Resizing patch
+	if [[ $TLSDYN == 'y' ]]; then
+		#wget https://raw.githubusercontent.com/nginx-modules/ngx_http_tls_dyn_size/master/nginx__dynamic_tls_records_1.17.7%2B.patch -O tcp-tls.patch
+		#patch -p1 <tcp-tls.patch
+		wget https://raw.githubusercontent.com/nailarch/patch/master/nginx.patch -O nginx.patch
+		patch -p1 < nginx.patch
+	fi
+
+	if [[ $BROTLI == 'y' ]]; then
+		NGINX_MODULES=$(
+			echo "$NGINX_MODULES"
+			echo "--add-module=/usr/local/src/nginx/modules/ngx_brotli"
+		)
+	fi
+
 	# Optional options
 	if [[ $LUA == 'y' ]]; then
 		NGINX_OPTIONS=$(
@@ -375,13 +390,6 @@ case $OPTION in
 		NGINX_MODULES=$(
 			echo "$NGINX_MODULES"
 			echo "--add-module=/usr/local/src/nginx/modules/incubator-pagespeed-ngx-${NPS_VER}-stable"
-		)
-	fi
-
-	if [[ $BROTLI == 'y' ]]; then
-		NGINX_MODULES=$(
-			echo "$NGINX_MODULES"
-			echo "--add-module=/usr/local/src/nginx/modules/ngx_brotli"
 		)
 	fi
 
@@ -463,14 +471,6 @@ case $OPTION in
 			echo "$NGINX_MODULES"
 			echo --add-module=/usr/local/src/nginx/modules/ModSecurity-nginx
 		)
-	fi
-
-	# Cloudflare's TLS Dynamic Record Resizing patch
-	if [[ $TLSDYN == 'y' ]]; then
-		#wget https://raw.githubusercontent.com/nginx-modules/ngx_http_tls_dyn_size/master/nginx__dynamic_tls_records_1.17.7%2B.patch -O tcp-tls.patch
-		#patch -p1 <tcp-tls.patch
-		wget https://raw.githubusercontent.com/nailarch/patch/master/nginx.patch -O nginx.patch
-		patch -p1 < nginx.patch
 	fi
 
 	# HTTP3
