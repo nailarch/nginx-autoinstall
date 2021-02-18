@@ -468,9 +468,6 @@ case $OPTION in
 	if [[ $TLSDYN == 'y' ]]; then
 		wget https://raw.githubusercontent.com/nailarch/patch/master/nginx.patch -O tcp-tls.patch
 		patch -p1 <tcp-tls.patch
-		wget https://raw.githubusercontent.com/nailarch/openssl-patch/master/nginx_io_uring.patch -O nginx_io_uring.patch
-		patch -p1 <nginx_io_uring.patch
-
 	fi
 
 	# HTTP3
