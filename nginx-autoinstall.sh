@@ -6,19 +6,19 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # Define versions
-NGINX_MAINLINE_VER=1.19.6
+NGINX_MAINLINE_VER=1.19.7
 NGINX_STABLE_VER=1.18.0
-LIBRESSL_VER=3.1.2
-OPENSSL_VER=1.1.1i
+LIBRESSL_VER=3.3.1
+OPENSSL_VER=1.1.1j
 NPS_VER=1.13.35.2
 HEADERMOD_VER=0.33
-LIBMAXMINDDB_VER=1.3.2
+LIBMAXMINDDB_VER=1.4.3
 GEOIP2_VER=3.3
-LUA_JIT_VER=2.1-20181029
-LUA_NGINX_VER=0.10.16rc5
+LUA_JIT_VER=2.1-20201027
+LUA_NGINX_VER=0.10.19
 NGINX_DEV_KIT=0.3.1
 
-# Define installation paramaters for headless install (fallback if unspecifed)
+# Define installation parameters for headless install (fallback if unspecifed)
 if [[ $HEADLESS == "y" ]]; then
 	OPTION=${OPTION:-1}
 	NGINX_VER=${NGINX_VER:-1}
@@ -338,8 +338,8 @@ case $OPTION in
 		--http-client-body-temp-path=/var/cache/nginx/client_temp \
 		--http-proxy-temp-path=/var/cache/nginx/proxy_temp \
 		--http-fastcgi-temp-path=/var/cache/nginx/fastcgi_temp \
-		--user=www-data \
-		--group=www-data \
+		--user=nginx \
+		--group=nginx \
 		--with-cc-opt=-Wno-deprecated-declarations \
 		--with-cc-opt=-Wno-ignored-qualifiers"
 
@@ -351,24 +351,8 @@ case $OPTION in
 		--with-http_auth_request_module \
 		--with-http_slice_module \
 		--with-http_stub_status_module \
-		--with-http_v2_hpack_enc \
 		--with-http_realip_module \
 		--with-http_sub_module"
-
-	# Cloudflare's TLS Dynamic Record Resizing patch
-	if [[ $TLSDYN == 'y' ]]; then
-		#wget https://raw.githubusercontent.com/nginx-modules/ngx_http_tls_dyn_size/master/nginx__dynamic_tls_records_1.17.7%2B.patch -O tcp-tls.patch
-		#patch -p1 <tcp-tls.patch
-		wget https://raw.githubusercontent.com/nailarch/patch/master/nginx.patch -O nginx.patch
-		patch -p1 < nginx.patch
-	fi
-
-	if [[ $BROTLI == 'y' ]]; then
-		NGINX_MODULES=$(
-			echo "$NGINX_MODULES"
-			echo "--add-module=/usr/local/src/nginx/modules/ngx_brotli"
-		)
-	fi
 
 	# Optional options
 	if [[ $LUA == 'y' ]]; then
@@ -390,6 +374,13 @@ case $OPTION in
 		NGINX_MODULES=$(
 			echo "$NGINX_MODULES"
 			echo "--add-module=/usr/local/src/nginx/modules/incubator-pagespeed-ngx-${NPS_VER}-stable"
+		)
+	fi
+
+	if [[ $BROTLI == 'y' ]]; then
+		NGINX_MODULES=$(
+			echo "$NGINX_MODULES"
+			echo "--add-module=/usr/local/src/nginx/modules/ngx_brotli"
 		)
 	fi
 
@@ -471,6 +462,15 @@ case $OPTION in
 			echo "$NGINX_MODULES"
 			echo --add-module=/usr/local/src/nginx/modules/ModSecurity-nginx
 		)
+	fi
+
+	# Cloudflare's TLS Dynamic Record Resizing patch
+	if [[ $TLSDYN == 'y' ]]; then
+		wget https://raw.githubusercontent.com/nailarch/patch/master/nginx.patch -O tcp-tls.patch
+		patch -p1 <tcp-tls.patch
+		wget https://raw.githubusercontent.com/nailarch/openssl-patch/master/nginx_io_uring.patch -O nginx_io_uring.patch
+		patch -p1 <nginx_io_uring.patch
+
 	fi
 
 	# HTTP3
@@ -576,6 +576,9 @@ case $OPTION in
 		/var/cache/nginx \
 		/lib/systemd/system/nginx.service \
 		/etc/systemd/system/multi-user.target.wants/nginx.service
+
+	# Reload systemctl
+	systemctl daemon-reload
 
 	# Remove conf files
 	if [[ $RM_CONF == 'y' ]]; then
